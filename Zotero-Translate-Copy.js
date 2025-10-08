@@ -1,18 +1,29 @@
+/*
+ * ZOTERO 条目翻译器 - 最终发布版 v1.0
+ *
+ * 这是一个功能完善且高度可配置的脚本，可以一键翻译Zotero中的中文条目，
+ * 并自动创建一个包含英文元数据的新条目副本。
+ */
+
 // ===================================================================
 //                        --- 用户配置区 ---
 //      将下面的值设置为 `true` (开启) 或 `false` (关闭) 来控制相应功能
 // ===================================================================
+
 // 选择翻译服务: 'bing' 或 'google'
 const TRANSLATE_SERVICE = 'bing';
 
-// 启用“关联”功能：在原始条目和翻译后的条目之间，创建一个可互相点击的“关联”链接。
+// 启用"关联"功能：在原始条目和翻译后的条目之间，创建一个可互相点击的"关联"链接。
 const ENABLE_RELATION_LINK = true;
 
-// 启用“短标题回链”：将原始的中文标题，添加到新条目的“短标题”字段中，方便快速识别和对照。
+// 启用"短标题回链"：将原始的中文标题，添加到新条目的"短标题"字段中，方便快速识别和对照。
 const ENABLE_SHORT_TITLE_LINK = true;
 
-// 启用“摘要”翻译：翻译原文的摘要部分。由于摘要通常很长，关闭此项可以显著加快脚本运行速度。
+// 启用"摘要"翻译：翻译原文的摘要部分。由于摘要通常很长，关闭此项可以显著加快脚本运行速度。
 const ENABLE_ABSTRACT_TRANSLATION = true;
+
+// 启用"标签"功能：为翻译后的条目添加"Translated_Copy"标签，方便识别和筛选。
+const ENABLE_TAGS = true;
 
 // ===================================================================
 //                      --- 配置区结束 ---
@@ -142,7 +153,7 @@ async function main() {
             let newCreator = { creatorType: creator.creatorType };
             if (creator.name) newCreator.name = await translateText(creator.name);
             else { newCreator.firstName = await translateText(creator.firstName); newCreator.lastName = await translateText(creator.lastName); }
-            newCreators.push(newCreator);
+            newCreators。push(newCreator);
         }
         if (newCreators.length > 0) newItem.setCreators(newCreators);
 
@@ -150,7 +161,9 @@ async function main() {
             newItem.setField('shortTitle', `[原] ${originalTitle}`);
         }
 
-        newItem。addTag(TAG_FOR_TRANSLATED);
+        if (ENABLE_TAGS) {
+            newItem。addTag(TAG_FOR_TRANSLATED);
+        }
         newItem.setField('language', TARGET_LANG);
         
         const newItemID = await newItem.saveTx();
@@ -159,9 +172,9 @@ async function main() {
             if (ENABLE_RELATION_LINK) {
                 const oldItemURI = `http://zotero.org/users/${userID}/items/${item.key}`;
                 const newItemURI = `http://zotero.org/users/${userID}/items/${newItem.key}`;
-                await newItem.addRelation('dc:relation', oldItemURI);
-                await item.addRelation('dc:relation', newItemURI);
-                await item.saveTx();
+                await newItem。addRelation('dc:relation'， oldItemURI);
+                await item。addRelation('dc:relation'， newItemURI);
+                await item。saveTx();
             }
             newItems.push(newItem);
         }
