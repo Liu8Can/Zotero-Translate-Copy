@@ -1,16 +1,9 @@
-/*
- * ZOTERO 条目翻译器 - 最终发布版 v1.0
- *
- * 这是我们合作调试的最终脚本，功能完善且高度可配置，已准备好分享和使用。
- * 它能够一键翻译Zotero中的中文条目，并自动创建一个包含英文元数据的新条目副本。
- *
- * 感谢我们这段精彩的合作之旅！
- */
-
 // ===================================================================
 //                        --- 用户配置区 ---
 //      将下面的值设置为 `true` (开启) 或 `false` (关闭) 来控制相应功能
 // ===================================================================
+// 选择翻译服务: 'bing' 或 'google'
+const TRANSLATE_SERVICE = 'bing';
 
 // 启用“关联”功能：在原始条目和翻译后的条目之间，创建一个可互相点击的“关联”链接。
 const ENABLE_RELATION_LINK = true;
@@ -34,7 +27,64 @@ const TARGET_LANG = 'en';
 const TAG_FOR_TRANSLATED = 'Translated_Copy';
 const MAX_RETRIES = 3;
 
-async function translateText(text) {
+// 获取 Bing 翻译的令牌
+async function getBingToken() {
+    try {
+        const response = await Zotero.HTTP.request(
+            'GET',
+            'https://edge.microsoft.com/translate/auth',
+            {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.42',
+                }
+            }
+        );
+        if (response.status === 200 && response.responseText) {
+            return response.responseText;
+        }
+        throw new Error('获取令牌失败');
+    } catch (e) {
+        Zotero.debug('获取 Bing 翻译令牌失败: ' + e);
+        throw e;
+    }
+}
+
+// Bing 翻译实现
+async function translateTextBing(text) {
+    if (!text || typeof text !== 'string' || !text.trim()) return text;
+    
+    for (let i = 0; i < MAX_RETRIES; i++) {
+        try {
+            const token = await getBingToken();
+            const response = await Zotero.HTTP.request(
+                'POST',
+                `https://api-edge.cognitive.microsofttranslator.com/translate?from=${SOURCE_LANG}&to=${TARGET_LANG}&api-version=3.0&includeSentenceLength=true`,
+                {
+                    headers: {
+                        'accept': '*/*',
+                        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                        'authorization': `Bearer ${token}`,
+                        'content-type': 'application/json',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.42',
+                    },
+                    body: JSON.stringify([{ text: text }]),
+                    responseType: 'json'
+                }
+            );
+
+            if (response.status === 200 && response.response) {
+                return response.response[0].translations[0].text;
+            }
+        } catch (e) {
+            Zotero.debug(`Bing 翻译尝试 ${i + 1} 次失败: ${e}`);
+        }
+        if (i < MAX_RETRIES - 1) await Zotero.Promise.delay(300 * (i + 1));
+    }
+    return `[翻译失败] ${text}`;
+}
+
+// Google 翻译实现
+async function translateTextGoogle(text) {
     if (!text || typeof text !== 'string' || !text.trim()) return text;
     for (let i = 0; i < MAX_RETRIES; i++) {
         try {
@@ -44,10 +94,15 @@ async function translateText(text) {
                 const json = JSON.parse(res.responseText);
                 if (json && json[0]) return json[0].map(segment => segment[0]).join('');
             }
-        } catch (e) { Zotero.debug(`翻译尝试 ${i + 1} 次失败: ${e}`); }
+        } catch (e) { Zotero.debug(`Google 翻译尝试 ${i + 1} 次失败: ${e}`); }
         if (i < MAX_RETRIES - 1) await Zotero.Promise.delay(300 * (i + 1));
     }
     return `[翻译失败] ${text}`;
+}
+
+// 根据配置选择翻译服务
+async function translateText(text) {
+    return TRANSLATE_SERVICE === 'bing' ? translateTextBing(text) : translateTextGoogle(text);
 }
 
 async function main() {
@@ -95,7 +150,7 @@ async function main() {
             newItem.setField('shortTitle', `[原] ${originalTitle}`);
         }
 
-        newItem.addTag(TAG_FOR_TRANSLATED);
+        newItem。addTag(TAG_FOR_TRANSLATED);
         newItem.setField('language', TARGET_LANG);
         
         const newItemID = await newItem.saveTx();
@@ -114,10 +169,18 @@ async function main() {
         translatedCount++;
     }
 
+    // 获取当前窗口的 Zotero 面板
     const pane = Zotero.getActiveZoteroPane();
     if (pane && newItems.length > 0) {
+        // 在当前分类下选中新创建的条目
         const newItemIDs = newItems.map(item => item.id);
-        pane.selectItems(newItemIDs, true);
+        
+        // 延迟一小段时间再选中条目，确保界面已更新
+        await Zotero.Promise.delay(100);
+        pane.selectItems(newItemIDs);
+        
+        // 强制更新界面
+        pane.itemsView?.refresh();
     }
 
     return `处理完成！成功翻译并创建了 ${translatedCount} 个新条目。`;
