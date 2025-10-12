@@ -153,7 +153,7 @@ async function main() {
             let newCreator = { creatorType: creator.creatorType };
             if (creator.name) newCreator.name = await translateText(creator.name);
             else { newCreator.firstName = await translateText(creator.firstName); newCreator.lastName = await translateText(creator.lastName); }
-            newCreators。push(newCreator);
+            newCreators.push(newCreator);
         }
         if (newCreators.length > 0) newItem.setCreators(newCreators);
 
@@ -162,7 +162,7 @@ async function main() {
         }
 
         if (ENABLE_TAGS) {
-            newItem。addTag(TAG_FOR_TRANSLATED);
+            newItem.addTag(TAG_FOR_TRANSLATED);
         }
         newItem.setField('language', TARGET_LANG);
         
@@ -172,9 +172,9 @@ async function main() {
             if (ENABLE_RELATION_LINK) {
                 const oldItemURI = `http://zotero.org/users/${userID}/items/${item.key}`;
                 const newItemURI = `http://zotero.org/users/${userID}/items/${newItem.key}`;
-                await newItem。addRelation('dc:relation'， oldItemURI);
-                await item。addRelation('dc:relation'， newItemURI);
-                await item。saveTx();
+                await newItem.addRelation('dc:relation', oldItemURI);
+                await item.addRelation('dc:relation', newItemURI);
+                await item.saveTx();
             }
             newItems.push(newItem);
         }
